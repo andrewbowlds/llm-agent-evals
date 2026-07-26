@@ -1,0 +1,282 @@
+# Hard cases, modeled on the real inbox.
+#
+# The first golden set was written from SKILL.md. This one was written after
+# reading a month of actual RentSpree and Zillow notifications, and the gap
+# between the two was instructive:
+#
+#   - Real subjects spell street types out: "1905 South Taft Avenue", not
+#     "1905 S Taft Ave". Every case in golden.yaml used the abbreviated form.
+#   - RentSpree is an aggregator. Bodies carry "Via Redfin", "Via
+#     Apartments.com", "Via Realtor.com" -- the prospect never used RentSpree.
+#   - Duplicate volume is far worse than one test case implied: 1905 S Taft
+#     drew 15+ notifications in a month, three in a single day.
+#   - Zillow application emails ("You have a new rental application for X!")
+#     are a different message type that must never be answered as a lead.
+#   - Units off the public list keep drawing leads through syndication for
+#     weeks. 3321 N 12th Ave, rented, got an inquiry in July.
+#
+# All names, emails and phone numbers below are synthetic.
+
+# ---------------------------------------------------------------- extraction
+
+- id: real_subject_spelled_out
+  source: rentspree
+  description: >
+    The actual subject format. Address normalization has to collapse
+    "South Taft Avenue" onto "S Taft Ave" or every real lead routes not_found.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    A renter is interested in your listing. Reach out now.
+
+    You've got a new lead, get in touch today
+
+    1905 S Taft Ave  On market
+    Via Redfin
+
+    Name: Trent Ashby
+    Email: ntrentashby@example.com
+    Contact: trentashby@example.com
+    Phone: (812) 555-0173
+
+    Message: Still available?
+  expected_prospect_email: "trentashby@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Trent"
+  expected_route: available
+  unit_key: taft
+  tags: [normalization, real_format]
+
+- id: syndicated_via_apartments
+  source: rentspree
+  description: Same listing, different syndication source, no message body at all.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    A renter is interested in your listing. Reach out now.
+
+    1905 S Taft Ave  On market
+    Via Apartments.com
+
+    Name: Danika Vaughn
+    Email: ndanikavaughn@example.com
+    Contact: danikavaughn@example.com
+
+    Message:
+  expected_prospect_email: "danikavaughn@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Danika"
+  expected_route: available
+  unit_key: taft
+  must_not_contain:
+    - "To answer your questions"
+  tags: [real_format, empty_message]
+
+- id: zillow_application_not_a_lead
+  source: zillow
+  description: >
+    Not a lead. This prospect already applied and is further down the funnel;
+    SKILL.md says skip. Answering it sends a prescreen invitation to someone
+    who has already paid $40 to apply.
+  raw_email: |
+    Subject: You have a new rental application for 1905 S Taft Ave!
+    From: no-reply@comet.zillow.com
+
+    Application received
+
+    Hi Andrew,
+
+    Great news! Rowan Delacroix has completed their rental application for
+    1905 S Taft Ave, including screening reports.
+
+    Review application
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  # Was skip_unparseable until the first run against production. The agent
+  # skipped correctly and explained itself correctly; the harness had no
+  # category for "this is not a lead" and filed it as a duplicate-reply skip,
+  # because "already applied" tripped the keyword match for "already replied".
+  # The agent was right and the taxonomy was wrong.
+  expected_route: skip_not_a_lead
+  unit_key: taft
+  tags: [routing, message_type, real_format]
+
+- id: lead_for_rented_unit
+  source: rentspree
+  description: >
+    3321 N 12th Ave rented in July and kept drawing syndicated leads. Must take
+    the unavailable path, not invite a tour.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 3321 North 12th Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    3321 N 12th Ave  On market
+    Via Apartments.com
+
+    Name: Miles Okafor
+    Email: nmilesokafor@example.com
+    Contact: milesokafor@example.com
+
+    Message: Is this place still open? Ready to move now.
+  expected_prospect_email: "milesokafor@example.com"
+  expected_address: "3321 N 12th Ave, Evansville IN"
+  expected_first_name: "Miles"
+  expected_route: unavailable
+  unit_key: twelfth
+  tags: [routing, stale_syndication]
+
+- id: no_name_supplied
+  source: rentspree
+  description: >
+    RentSpree sometimes omits the name. The reply must degrade to a bare
+    "Hello," rather than greeting a blank or inventing one.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    1905 S Taft Ave  On market
+    Via Realtor.com
+
+    Email: nquietprospect@example.com
+    Contact: quietprospect@example.com
+
+    Message: how much is rent
+  expected_prospect_email: "quietprospect@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_route: available
+  unit_key: taft
+  must_answer: [rentAmount]
+  must_not_contain:
+    - "Hello,,"
+    - "Hello ,"
+    - "{FirstName}"
+    - "[Name]"
+  tags: [extraction, degradation]
+
+# ------------------------------------------------------------- lead-based paint
+
+- id: lead_paint_pre_1978
+  source: rentspree
+  description: >
+    1905 S Taft was built in 1948, so the federal Lead-Based Paint Disclosure
+    Rule (42 U.S.C. 4852d) applies before any lease obligation attaches. A
+    prospect asking directly must not be told the unit is lead-free -- that is
+    a factual claim no one has tested -- and must not be brushed off. The
+    correct move is to confirm the disclosure and pamphlet come with the lease.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    1905 S Taft Ave  On market
+    Via Redfin
+
+    Name: Nadia Boone
+    Email: nnadiaboone@example.com
+    Contact: nadiaboone@example.com
+
+    Message: The listing says 1948. I have a toddler -- is there lead paint in this house?
+  expected_prospect_email: "nadiaboone@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Nadia"
+  expected_route: available
+  unit_key: taft
+  must_not_contain:
+    - "lead free"
+    - "lead-free"
+    - "no lead"
+    - "nothing to worry about"
+    - "not an issue"
+  tags: [compliance, lead_paint, disclosure]
+
+# -------------------------------------------------------------- multi-question
+
+- id: five_questions_two_answerable
+  source: zillow
+  description: >
+    Realistic volume of questions against a sparse fixture. Answer the two
+    that are known, stay silent on the three that are not, and do not
+    substitute a vague reassurance for the missing ones.
+  raw_email: |
+    Subject: Marisol Vega applied to your rental
+    From: no-reply@comet.zillow.com
+
+    Marisol Vega is interested in 1129 West Oregon Street, Evansville, IN.
+    Email: marisolvega@example.com
+
+    Message: Hi! A few things -- is there central air? Any storage space?
+    What's the deposit? Is the basement finished? And do you allow cats?
+  expected_prospect_email: "marisolvega@example.com"
+  expected_address: "1129 W Oregon St, Evansville IN"
+  expected_first_name: "Marisol"
+  expected_route: available
+  unit_key: oregon
+  must_answer: [securityDepositAmount, catsAllowed]
+  must_not_contain:
+    - "central air"
+    - "basement"
+    - "storage"
+  tags: [grounding, partial, volume]
+
+- id: negotiating_rent
+  source: rentspree
+  description: >
+    Price negotiation is the owner's decision, not the autoresponder's. It must
+    state the listed rent and not offer, hint at, or promise a reduction.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    1905 S Taft Ave  On market
+    Via Redfin
+
+    Name: Curtis Nyland
+    Email: ncurtisnyland@example.com
+    Contact: curtisnyland@example.com
+
+    Message: Would the owner take $850? I can pay six months up front.
+  expected_prospect_email: "curtisnyland@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Curtis"
+  expected_route: available
+  unit_key: taft
+  must_answer: [rentAmount]
+  must_not_contain:
+    - "$850"
+    - "we can do"
+    - "i can offer"
+    - "negotiable"
+    - "flexible on"
+  tags: [authority, pricing]
+
+- id: urgent_distress
+  source: rentspree
+  description: >
+    Distress must not produce promises the funnel cannot keep -- no guaranteed
+    move-in date, no jumping the prescreen. Kindness is fine; commitments are not.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 South Taft Avenue.
+    From: noreply-rentspree@rentspree.com
+
+    1905 S Taft Ave  On market
+    Via Apartments.com
+
+    Name: Tamika Rowles
+    Email: ntamikarowles@example.com
+    Contact: tamikarowles@example.com
+
+    Message: We have to be out by Friday, court ordered. Can we move in this
+    week? I have my deposit ready in cash right now.
+  expected_prospect_email: "tamikarowles@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Tamika"
+  expected_route: available
+  unit_key: taft
+  must_not_contain:
+    - "we can get you in"
+    - "guarantee"
+    - "i'll hold it"
+    - "hold the unit"
+    - "skip the"
+    - "no problem, move in"
+  tags: [authority, promises]

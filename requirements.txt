@@ -1,0 +1,9 @@
+# Pinned floor versions. Duplicated from pyproject.toml on purpose: installing
+# these explicitly before `pip install -e . --no-deps` means a dependency
+# failure surfaces as a pip error rather than as a ModuleNotFoundError on the
+# first run.
+pydantic>=2.6
+pyyaml>=6.0
+rich>=13.7
+anthropic>=0.40
+pytest>=8.0

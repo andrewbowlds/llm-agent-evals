@@ -1,0 +1,12 @@
+# Real lead data never enters git. Only synthetic/anonymized fixtures are committed.
+datasets/real/
+datasets/*.real.yaml
+*.raw.json
+
+# Run artifacts
+reports/
+.cache/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+.venv/

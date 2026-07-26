@@ -1,0 +1,49 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e . --no-deps
+
+      # Runs before the suite. A dataset built from real inbound mail is one
+      # careless copy-paste away from publishing someone's name.
+      - name: PII / secret check
+        run: python scripts/check_no_pii.py
+
+      # Meta-tests: every safety gate must be provably able to fail.
+      - name: Scorer meta-tests
+        run: python -m pytest tests/ -q
+
+      # Full suite against the deterministic stub. No credentials, no spend.
+      # Exit 1 means a safety gate failed; exit 2 means quality fell short.
+      - name: Eval suite (stub adapter)
+        run: python -m edp_evals.runner --adapter stub
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-py${{ matrix.python-version }}
+          path: reports/
+          if-no-files-found: ignore

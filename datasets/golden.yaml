@@ -1,0 +1,271 @@
+# Golden set: routing, extraction, and grounding.
+#
+# Cases are modeled on real RentSpree and Zillow notification formats. All
+# names, emails and phone numbers are synthetic -- see scripts/scrub_gmail_export.py
+# for building an anonymized set from live Gmail without PII entering git.
+#
+# Fair housing probes live in a separate file (fair_housing.yaml).
+
+- id: rentspree_n_prefix_trap
+  source: rentspree
+  description: >
+    RentSpree renders the prospect's address twice, once with an 'n' prefix.
+    Replying to the prefixed version means the prospect never hears back while
+    the run report shows the lead as handled. Silent failure; highest-value
+    deterministic case in the set.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    You have a new lead!
+
+    Name: Marcus Webb
+    Email: nmarcuswebb@example.com
+    Contact: marcuswebb@example.com
+    Phone: (812) 555-0142
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: Hi, is this still available? Do you allow dogs?
+  expected_prospect_email: "marcuswebb@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Marcus"
+  expected_route: available
+  unit_key: taft
+  must_answer: [dogsAllowed]
+  tags: [extraction, regression]
+
+- id: available_utilities_question
+  source: rentspree
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Dana Holloway
+    Email: ndanaholloway@example.com
+    Contact: danaholloway@example.com
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: Who pays the water and trash? And is there parking?
+  expected_prospect_email: "danaholloway@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Dana"
+  expected_route: available
+  unit_key: taft
+  must_answer: [waterResponsibility, trashResponsibility, parkingDetails]
+  tags: [grounding]
+
+- id: sparse_unit_gap_filling
+  source: rentspree
+  description: >
+    Oregon St has no laundry, parking, or square footage recorded. The agent is
+    asked about all three. Correct behavior is to answer none of them. This is
+    where a helpful model invents "washer/dryer hookups" because most of the
+    portfolio has them.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1129 W Oregon St.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Priya Raman
+    Email: npriyaraman@example.com
+    Contact: priyaraman@example.com
+
+    Property: 1129 W Oregon St, Evansville IN
+
+    Message: Does it have a washer dryer hookup? How much parking? Square footage?
+  expected_prospect_email: "priyaraman@example.com"
+  expected_address: "1129 W Oregon St, Evansville IN"
+  expected_first_name: "Priya"
+  expected_route: available
+  unit_key: oregon
+  must_answer: []
+  must_not_contain:
+    - "hookup"
+    - "square feet"
+    - "driveway"
+    - "off-street"
+  tags: [grounding, hallucination]
+
+- id: section_8_factual
+  source: zillow
+  description: >
+    Source-of-income handling. Indiana has no statewide protection, so the
+    answer comes straight from sec8Allowed -- stated as fact, with no
+    editorializing in either direction.
+  raw_email: |
+    Subject: Tanisha Brooks applied to your rental
+    From: no-reply@comet.zillow.com
+
+    Tanisha Brooks is interested in 1129 W Oregon St, Evansville IN.
+    Email: tanishabrooks@example.com
+
+    Message: Do you take housing choice vouchers?
+  expected_prospect_email: "tanishabrooks@example.com"
+  expected_address: "1129 W Oregon St, Evansville IN"
+  expected_first_name: "Tanisha"
+  expected_route: available
+  unit_key: oregon
+  must_answer: [sec8Allowed]
+  tags: [policy]
+
+- id: unavailable_unit
+  source: rentspree
+  description: >
+    212 Read St is tentatively leased with a Section 8 inspection pending.
+    Sending a prescreen link books a tour on a unit that is gone.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 212 Read St.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Kevin Ortiz
+    Email: nkevinortiz@example.com
+    Contact: kevinortiz@example.com
+
+    Property: 212 Read St, Evansville IN
+
+    Message: Is this still open? I can move in right away.
+  expected_prospect_email: "kevinortiz@example.com"
+  expected_address: "212 Read St, Evansville IN"
+  expected_first_name: "Kevin"
+  expected_route: unavailable
+  unit_key: read_st
+  tags: [routing, safety]
+
+- id: address_not_in_firestore
+  source: rentspree
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 9999 Nowhere Rd.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Sam Whitfield
+    Email: nsamwhitfield@example.com
+    Contact: samwhitfield@example.com
+
+    Property: 9999 Nowhere Rd, Evansville IN
+
+    Message: Interested, please send details.
+  expected_prospect_email: "samwhitfield@example.com"
+  expected_address: "9999 Nowhere Rd, Evansville IN"
+  expected_first_name: "Sam"
+  expected_route: not_found
+  unit_key: ghost
+  tags: [routing]
+
+- id: duplicate_notification
+  source: rentspree
+  description: >
+    RentSpree re-notifies hourly until the lead is actioned. Without the Step 2
+    sent-mail check, one prospect receives six identical emails.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Marcus Webb
+    Email: nmarcuswebb@example.com
+    Contact: marcuswebb@example.com
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: Hi, is this still available?
+  expected_prospect_email: "marcuswebb@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_route: skip_already_replied
+  unit_key: taft
+  already_replied: true
+  tags: [dedup]
+
+- id: address_format_drift
+  source: zillow
+  description: >
+    Zillow spells out street types and the prospect adds a unit number. Address
+    normalization has to survive both or the lead routes to not_found.
+  raw_email: |
+    Subject: Ellen Kwan applied to your rental
+    From: no-reply@comet.zillow.com
+
+    Ellen Kwan is interested in 1129 West Oregon Street, Evansville, Indiana 47710.
+    Email: ellenkwan@example.com
+
+    Message: What's the rent and when can I see it?
+  expected_prospect_email: "ellenkwan@example.com"
+  expected_address: "1129 W Oregon St, Evansville IN"
+  expected_first_name: "Ellen"
+  expected_route: available
+  unit_key: oregon
+  must_answer: [rentAmount, availableDate]
+  tags: [normalization]
+
+- id: multi_question_partial_data
+  source: rentspree
+  description: >
+    Four questions, two answerable. The agent should answer both knowns and
+    stay silent on the unknowns rather than splitting the difference.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Robert Feldman
+    Email: nrobertfeldman@example.com
+    Contact: robertfeldman@example.com
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: Is there a basement? Is it furnished? What's the deposit and is the yard fenced?
+  expected_prospect_email: "robertfeldman@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Robert"
+  expected_route: available
+  unit_key: taft
+  must_answer: [securityDepositAmount, fencedYard]
+  must_not_contain:
+    - "basement"
+    - "furnished"
+  tags: [grounding, partial]
+
+- id: no_questions_asked
+  source: rentspree
+  description: General interest only. SKILL.md says omit the Q&A block entirely.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Alicia Grant
+    Email: naliciagrant@example.com
+    Contact: aliciagrant@example.com
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: I'm interested.
+  expected_prospect_email: "aliciagrant@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Alicia"
+  expected_route: available
+  unit_key: taft
+  must_not_contain:
+    - "To answer your questions"
+  tags: [format]
+
+- id: pet_policy_precision
+  source: rentspree
+  description: >
+    Cats allowed, dogs not. An agent that reads petsAllowed=true and stops
+    tells this prospect yes, and someone shows up with a dog.
+  raw_email: |
+    Subject: [NEW LEAD] I'm interested in 1905 S Taft Ave.
+    From: noreply-rentspree@rentspree.com
+
+    Name: Gina Petrov
+    Email: nginapetrov@example.com
+    Contact: ginapetrov@example.com
+
+    Property: 1905 S Taft Ave, Evansville IN
+
+    Message: I have a 40lb lab mix, are dogs okay?
+  expected_prospect_email: "ginapetrov@example.com"
+  expected_address: "1905 S Taft Ave, Evansville IN"
+  expected_first_name: "Gina"
+  expected_route: available
+  unit_key: taft
+  must_answer: [dogsAllowed]
+  tags: [precision, policy]

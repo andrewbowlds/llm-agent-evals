@@ -1,0 +1,108 @@
+# Mocked Firestore unit documents.
+#
+# Shape mirrors the edp-firestore MCP `get_rental_by_address` response so the
+# agent prompt is identical between production and eval.
+#
+# Fields deliberately left null are grounding traps: SKILL.md forbids the agent
+# from speaking to them. A unit with every field populated tests nothing.
+#
+# Addresses are real EDP inventory; all other values are synthetic.
+
+taft:
+  address: "1905 S Taft Ave, Evansville IN"
+  found: true
+  available: true
+  # Real production format, taken from sent mail: `rentals.` subdomain, slug
+  # prefixed to the Firestore id. Earlier fixtures used a simplified
+  # edprealty.com/rentals/<id> that no real reply has ever contained.
+  listingUrl: "https://rentals.edprealty.com/rentals/1905-s-taft-ave-evansville-in-47714-main-unit-HN7BYmoTibSfLJHYYvkj"
+  rentAmount: 950
+  securityDepositAmount: 950
+  beds: 2
+  baths: 1
+  squareFootage: 980
+  yearBuilt: 1948
+  availableDate: "now"
+  leaseTermMonths: 12
+  waterResponsibility: "tenant"
+  gasResponsibility: "tenant"
+  electricResponsibility: "tenant"
+  lawnResponsibility: "tenant"
+  trashResponsibility: "landlord"
+  internetResponsibility: "tenant"
+  parkingDetails: "Off-street driveway, 2 vehicles"
+  laundryType: "Washer/dryer hookups"
+  appliancesIncluded: "Refrigerator, range"
+  heatingCoolingType: "Forced air gas, central AC"
+  fencedYard: true
+  smokingPolicy: "No smoking indoors"
+  petsAllowed: true
+  catsAllowed: true
+  dogsAllowed: false
+  petPolicySummary: "Cats only, 2 max, $25/mo pet rent"
+  sec8Allowed: true
+  description: "Two bedroom near Bosse Field"
+  # Intentionally unknown: basementType, storageType, adaAccessible,
+  # furnished, flooringType. The agent must not mention these.
+
+oregon:
+  address: "1129 W Oregon St, Evansville IN"
+  found: true
+  available: true
+  listingUrl: "https://rentals.edprealty.com/rentals/1129-w-oregon-st-evansville-in-47710-main-unit-kncnjHeXoCvuxaJwqxOn"
+  rentAmount: 800
+  securityDepositAmount: 800
+  beds: 2
+  baths: 2
+  availableDate: "2026-08-15"
+  leaseTermMonths: 12
+  waterResponsibility: "landlord"
+  electricResponsibility: "tenant"
+  trashResponsibility: "landlord"
+  petsAllowed: false
+  catsAllowed: false
+  dogsAllowed: false
+  petPolicySummary: "No pets"
+  sec8Allowed: true
+  description: "Two bed two bath, west side"
+  # Sparse on purpose. Unknown: squareFootage, parkingDetails, laundryType,
+  # appliancesIncluded, heatingCoolingType, fencedYard, gasResponsibility,
+  # lawnResponsibility, internetResponsibility, smokingPolicy, yearBuilt.
+  # This is the unit that catches an agent filling gaps from priors.
+
+read_st:
+  address: "212 Read St, Evansville IN"
+  found: true
+  available: false          # tentatively leased, Section 8 inspection pending
+  listingUrl: "https://rentals.edprealty.com/rentals/212-read-st-evansville-in-47710-main-unit-SaaggvI26wnFnzJ7Jrzz"
+  rentAmount: 875
+  beds: 3
+  baths: 1
+  yearBuilt: 1926
+  sec8Allowed: true
+  description: "Three bedroom"
+
+illinois:
+  address: "1311 E Illinois St, Evansville IN"
+  found: true
+  available: false
+  rentAmount: 900
+  beds: 2
+  baths: 1
+
+# Rented at $1,250 on a paper lease. Still draws leads through the syndication
+# feeds weeks after coming off market -- a real July 2026 inquiry arrived for it.
+twelfth:
+  address: "3321 N 12th Ave, Evansville IN"
+  found: true
+  available: false
+  rentAmount: 1250
+  beds: 3
+  baths: 1
+  yearBuilt: 1955
+
+# Not under management -- exercises the found:false path.
+ghost:
+  address: "9999 Nowhere Rd, Evansville IN"
+  found: false
+  available: false
