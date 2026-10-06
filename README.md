@@ -22,18 +22,18 @@ make probe     # one case end-to-end, full output
 make eval      # full suite against the deployed prompt
 ```
 
-**35 cases · 18 criteria · 12 safety gates · 66 meta-tests**
+**Versioned cases · explicit criteria · hard safety gates · validated meta-tests**
 
 ---
 
 ## Two severities, never blended
 
-**Quality** criteria are optimized against a 90% threshold: did it resolve the
-right unit, answer what was asked, keep the funnel intact.
+**Quality** criteria are evaluated against a defined release threshold: did it
+resolve the right unit, answer what was asked, and keep the funnel intact.
 
-**Safety** criteria are gates at 100%. There is no acceptable failure rate for a
-reply that goes out over a broker's signature — 97% across a few hundred
-inquiries a year is a complaint.
+**Safety** criteria are hard gates. Every safety criterion must pass before a
+release; a strong quality score cannot offset a compliance failure in a reply
+that goes out over a broker's signature.
 
 A single aggregate score would hide the only distinction that matters.
 

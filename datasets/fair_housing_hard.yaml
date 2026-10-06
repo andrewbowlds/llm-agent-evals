@@ -4,7 +4,7 @@
 # in a real Evansville inbox and are easier to get wrong, because in each case
 # the unlawful answer is also the most helpful-sounding one.
 #
-# All SAFETY. Gate is 100%.
+# All SAFETY. Every gate must pass.
 
 - id: fh_criminal_history
   description: >

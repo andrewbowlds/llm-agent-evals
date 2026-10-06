@@ -16,9 +16,11 @@ The short version: across two rounds the suite surfaced seven defects. Six of
 them were in my evaluation, not in the agent. That turned out to be the most
 useful thing I learned.
 
-**Current state:** 35 cases, 18 criteria, 66 meta-tests. Against the deployed
-prompt, 34/35 cases clean, all twelve safety gates at 100%. The single
-remaining failure is discussed below — it is also mine, not the agent's.
+**Current state:** the versioned suite contains representative and adversarial
+cases, explicit quality criteria, hard safety gates, and meta-tests that verify
+the scorers themselves. The repository and generated run artifacts are the
+source of truth for its current size and results rather than a frozen count in
+this case study.
 
 ---
 
@@ -42,13 +44,12 @@ few hundred emails a year on your behalf.
 
 Three decisions did most of the work.
 
-**Two severities, never blended.** Quality criteria are optimized against a 90%
-threshold: did it resolve the right unit, answer what was asked, keep the
-funnel intact. Safety criteria are gates at 100%: fair housing, hallucinated
-availability, disclosure obligations. A single aggregate score would hide the
-only distinction that matters. 97% on tone is fine. 97% on fair housing means
-roughly one in thirty prospects received a reply I would have to explain to an
-investigator.
+**Two severities, never blended.** Quality criteria use a defined release
+threshold: did it resolve the right unit, answer what was asked, and keep the
+funnel intact. Safety criteria are hard gates covering fair housing,
+hallucinated availability, and disclosure obligations. A single aggregate
+score would hide the only distinction that matters: a minor quality miss may
+be acceptable, while a fair-housing failure is not.
 
 **The suite tests the deployed prompt, not a copy.** The adapter loads
 `SKILL.md` directly out of the shipped `.skill` archive. Editing the real agent
@@ -143,9 +144,9 @@ test suite so the correction cannot regress.
 
 ### The same mistake, twice
 
-I widened the suite from 21 cases to 35 and ran it again. One case failed:
-a Zillow *"application received"* notice, which the agent must skip rather than
-answer as a lead.
+I widened the suite with a second set of production-informed cases and ran it
+again. A Zillow *"application received"* notice failed, even though the agent
+must skip it rather than answer it as a lead.
 
 The agent skipped it, and explained itself accurately. My harness scored it a
 routing failure — because `Route` had only two kinds of skip, "already replied"
@@ -189,9 +190,9 @@ the skip check. Both would have quietly distorted every future run.
   the obvious next step — supplementing the deterministic gates, never
   replacing them.
 - **A clean board is weak evidence.** The first full run against production
-  passed 21 of 21. That is more likely to mean my test set was too easy than
-  that the agent is flawless, which is why the second pass grew it to 35 with
-  cases drawn from real inbox patterns rather than from the spec. The agent has
+  passed every case. That is more likely to mean my test set was too easy than
+  that the agent is flawless, which is why the second pass added cases drawn
+  from real inbox patterns rather than from the spec. The agent has
   still not failed a case I did not later conclude was my error — which I read
   as the suite not yet being hard enough, not as the agent being finished.
 - **No production monitoring.** This is development-time evaluation. Detecting
